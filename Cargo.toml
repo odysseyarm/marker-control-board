@@ -1,0 +1,18 @@
+[package]
+name = "marker-control-board"
+version = "0.1.0"
+edition = "2021"
+
+[dependencies]
+embassy-executor = { version = "0.6.1", features = ["arch-cortex-m", "executor-thread", "defmt", "integrated-timers"] }
+embassy-futures = { version = "0.1.1", features = ["defmt"] }
+embassy-time = "0.3.2"
+embassy-nrf = { version = "0.2.0", features = ["nrf52833", "defmt", "time-driver-rtc1", "gpiote", "time"] }
+
+cortex-m-rt = "0.7.3"
+cortex-m = { version = "0.7.7", features = ["inline-asm", "critical-section-single-core"] }
+defmt-rtt = "0.4.1"
+panic-probe = { version = "0.3.1", features = ["print-defmt"] }
+nrf52833-pac = "0.12.2"
+defmt = "0.3.8"
+nrf52833-hal = "0.18.0"
