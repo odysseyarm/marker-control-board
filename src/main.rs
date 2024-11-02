@@ -6,8 +6,8 @@ mod pinout;
 
 use cortex_m::prelude::_embedded_hal_blocking_delay_DelayMs;
 use embassy_executor::Spawner;
-use embassy_nrf::{config::HfclkSource, gpio::{self, AnyPin, Pull}, interrupt::{self, InterruptExt}};
-use nrf52833_pac::{Peripherals, P0};
+use embassy_nrf::{config::HfclkSource, gpio::{self, AnyPin, Pin as _, Pull}, interrupt::{self, InterruptExt}, Peripheral as _};
+use nrf52833_pac::{p0::pin_cnf::PIN_CNF_SPEC, Peripherals, P0};
 use nrf52833_pac as pac;
 use defmt::*;
 
@@ -43,7 +43,6 @@ async fn main(spawner: Spawner) {
     config.hfclk_source = HfclkSource::ExternalXtal;
     let p = embassy_nrf::init(config);
 
-    info!("power on");
     print_reset_reasons();
 
     spawner.must_spawn(power_button_loop(pinout!(p.pwr_btn).into()));
@@ -51,8 +50,10 @@ async fn main(spawner: Spawner) {
 
 #[embassy_executor::task]
 async fn power_button_loop(pin: AnyPin) {
+    let mut pwr_btn = pin.into_ref();
+
     {
-        let mut pwr_btn = gpio::Input::new(pin, Pull::Up);
+        let mut pwr_btn = gpio::Input::new(pwr_btn.reborrow(), Pull::Up);
         pwr_btn.wait_for_falling_edge().await;
         pwr_btn.wait_for_rising_edge().await;
     }
@@ -60,8 +61,7 @@ async fn power_button_loop(pin: AnyPin) {
     {
         let sense_when_goes_to = gpio::Level::Low;
 
-        // P0.11
-        unsafe { &(*P0::ptr()).pin_cnf[11] }.write(|w| {
+        pin_cnf(pwr_btn).write(|w| {
             w.dir().input();
             w.input().connect();
             w.pull().pullup();
@@ -80,6 +80,13 @@ async fn power_button_loop(pin: AnyPin) {
 
     let peripherals = Peripherals::take().unwrap();
     peripherals.POWER.systemoff.write(|w| w.systemoff().enter());
-    info!("after system off???");
     loop {}
+}
+
+fn pin_cnf(pin: embassy_nrf::PeripheralRef<AnyPin>) -> &'static nrf52833_pac::generic::Reg<PIN_CNF_SPEC> {
+    let idx = pin.pin() as usize;
+    match pin.port() {
+        gpio::Port::Port0 => unsafe { &(*nrf52833_pac::P0::ptr()).pin_cnf[idx] },
+        gpio::Port::Port1 => unsafe { &(*nrf52833_pac::P1::ptr()).pin_cnf[idx] },
+    }
 }
