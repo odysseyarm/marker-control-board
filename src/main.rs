@@ -38,17 +38,36 @@ fn print_reset_reasons() {
 }
 
 #[embassy_executor::main]
-async fn main(spawner: Spawner) {
+async fn fake_main(spawner: Spawner) {
+    main().await;
+
+    let peripherals = Peripherals::take().unwrap();
+    peripherals.POWER.systemoff.write(|w| w.systemoff().enter());
+    loop {}
+}
+
+async fn main() {
     let mut config = embassy_nrf::config::Config::default();
     config.hfclk_source = HfclkSource::ExternalXtal;
     let p = embassy_nrf::init(config);
 
     print_reset_reasons();
 
-    spawner.must_spawn(power_button_loop(pinout!(p.pwr_btn).into()));
+    // ir led init
+    let mut ir_led0 = gpio::Output::new(pinout!(p.ir_led0), embassy_nrf::gpio::Level::High, gpio::OutputDrive::Standard);
+    let mut ir_led1 = gpio::Output::new(pinout!(p.ir_led1), embassy_nrf::gpio::Level::High, gpio::OutputDrive::Standard);
+
+    // set gpio defaults
+    let _ = gpio::Output::new(pinout!(p.ir_iset1), embassy_nrf::gpio::Level::High, gpio::OutputDrive::Standard);
+    let _ = gpio::Output::new(pinout!(p.ir_iset0), embassy_nrf::gpio::Level::Low, gpio::OutputDrive::Standard);
+    let _ = gpio::Output::new(pinout!(p.drivev), embassy_nrf::gpio::Level::High, gpio::OutputDrive::Standard);
+
+    ir_led0.set_high();
+    ir_led1.set_high();
+
+    power_button_loop(pinout!(p.pwr_btn).into()).await;
 }
 
-#[embassy_executor::task]
 async fn power_button_loop(pin: AnyPin) {
     let mut pwr_btn = pin.into_ref();
 
@@ -75,12 +94,6 @@ async fn power_button_loop(pin: AnyPin) {
             w
         });
     }
-
-    info!("power off");
-
-    let peripherals = Peripherals::take().unwrap();
-    peripherals.POWER.systemoff.write(|w| w.systemoff().enter());
-    loop {}
 }
 
 fn pin_cnf(pin: embassy_nrf::PeripheralRef<AnyPin>) -> &'static nrf52833_pac::generic::Reg<PIN_CNF_SPEC> {
