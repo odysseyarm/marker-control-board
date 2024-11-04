@@ -54,13 +54,13 @@ async fn main() {
     print_reset_reasons();
 
     // ir led init
-    let mut ir_led0 = gpio::Output::new(pinout!(p.ir_led0), embassy_nrf::gpio::Level::High, gpio::OutputDrive::Standard);
-    let mut ir_led1 = gpio::Output::new(pinout!(p.ir_led1), embassy_nrf::gpio::Level::High, gpio::OutputDrive::Standard);
+    let mut ir_led0 = gpio::Output::new(pinout!(p.ir_led0), embassy_nrf::gpio::Level::Low, gpio::OutputDrive::Standard);
+    let mut ir_led1 = gpio::Output::new(pinout!(p.ir_led1), embassy_nrf::gpio::Level::Low, gpio::OutputDrive::Standard);
 
     // set gpio defaults
-    let _ = gpio::Output::new(pinout!(p.ir_iset1), embassy_nrf::gpio::Level::High, gpio::OutputDrive::Standard);
-    let _ = gpio::Output::new(pinout!(p.ir_iset0), embassy_nrf::gpio::Level::Low, gpio::OutputDrive::Standard);
-    let _ = gpio::Output::new(pinout!(p.drivev), embassy_nrf::gpio::Level::High, gpio::OutputDrive::Standard);
+    let __ = gpio::Output::new(pinout!(p.ir_iset1), embassy_nrf::gpio::Level::High, gpio::OutputDrive::Standard);
+    let __ = gpio::Output::new(pinout!(p.ir_iset0), embassy_nrf::gpio::Level::Low, gpio::OutputDrive::Standard);
+    let __ = gpio::Output::new(pinout!(p.drivev), embassy_nrf::gpio::Level::High, gpio::OutputDrive::Standard);
 
     ir_led0.set_high();
     ir_led1.set_high();
