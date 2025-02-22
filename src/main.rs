@@ -4,10 +4,9 @@
 #[macro_use]
 mod pinout;
 
-use cortex_m::prelude::_embedded_hal_blocking_delay_DelayMs;
 use embassy_executor::Spawner;
-use embassy_nrf::{config::HfclkSource, gpio::{self, AnyPin, Pin as _, Pull}, interrupt::{self, InterruptExt}, Peripheral as _};
-use nrf52833_pac::{p0::pin_cnf::PIN_CNF_SPEC, Peripherals, P0};
+use embassy_nrf::{bind_interrupts, config::HfclkSource, gpio::{self, AnyPin, Pin as _, Pull}, peripherals, twim::{self, Twim}, Peripheral as _};
+use nrf52833_pac::{p0::pin_cnf::PIN_CNF_SPEC, Peripherals};
 use nrf52833_pac as pac;
 use defmt::*;
 
@@ -38,13 +37,17 @@ fn print_reset_reasons() {
 }
 
 #[embassy_executor::main]
-async fn fake_main(spawner: Spawner) {
+async fn fake_main(_spawner: Spawner) {
     main().await;
 
     let peripherals = Peripherals::take().unwrap();
     peripherals.POWER.systemoff.write(|w| w.systemoff().enter());
     loop {}
 }
+
+bind_interrupts!(struct Irqs {
+    SPIM0_SPIS0_TWIM0_TWIS0_SPI0_TWI0 => twim::InterruptHandler<peripherals::TWISPI0>;
+});
 
 async fn main() {
     let mut config = embassy_nrf::config::Config::default();
@@ -53,17 +56,26 @@ async fn main() {
 
     print_reset_reasons();
 
+    let twi = Twim::new(p.TWISPI0, Irqs, pinout!(p.sda), pinout!(p.scl), twim::Config::default());
+
+    let mut pcal6408a = port_expander::Pcal6408a::new(twi, false);
+    let pca_pins = pcal6408a.split();
+
     // ir led init
     let mut ir_led0 = gpio::Output::new(pinout!(p.ir_led0), embassy_nrf::gpio::Level::Low, gpio::OutputDrive::Standard);
     let mut ir_led1 = gpio::Output::new(pinout!(p.ir_led1), embassy_nrf::gpio::Level::Low, gpio::OutputDrive::Standard);
+    let mut ir_led2 = gpio::Output::new(pinout!(p.ir_led2), embassy_nrf::gpio::Level::Low, gpio::OutputDrive::Standard);
+    let mut ir_led3 = gpio::Output::new(pinout!(p.ir_led3), embassy_nrf::gpio::Level::Low, gpio::OutputDrive::Standard);
 
     // set gpio defaults
-    let __ = gpio::Output::new(pinout!(p.ir_iset1), embassy_nrf::gpio::Level::High, gpio::OutputDrive::Standard);
-    let __ = gpio::Output::new(pinout!(p.ir_iset0), embassy_nrf::gpio::Level::Low, gpio::OutputDrive::Standard);
-    let __ = gpio::Output::new(pinout!(p.drivev), embassy_nrf::gpio::Level::High, gpio::OutputDrive::Standard);
+    pinout!(pca_pins.ir_iset1).into_output_high().unwrap();
+    pinout!(pca_pins.ir_iset0).into_output().unwrap().set_low().unwrap();
+    pinout!(pca_pins.drivev).into_output_high().unwrap();
 
     ir_led0.set_high();
     ir_led1.set_high();
+    ir_led2.set_high();
+    ir_led3.set_high();
 
     power_button_loop(pinout!(p.pwr_btn).into()).await;
 }
